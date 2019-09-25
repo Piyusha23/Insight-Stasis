@@ -16,24 +16,9 @@ def number_of_unique_patients(data, id):
     print ('Number of patients in dataset = ', len_unique_ids)
 
 def filter_wanted_data(data):
-    vitals = data.filter(['patient_id', 'vital_time','pulse','spo2','resp', 'bpSys', 'temperature'], axis = 1)
-    data = vitals[(vitals != 0).all(1)]
+    vitals = data.filter(['patient_id', 'vital_time','pulse','spo2','resp', 'bpSys', 'temperature', 'MEWS_clean'], axis = 1)
+    #data = vitals[(vitals != 0).all(1)]
     return data
-
-def get_random_data_sample(data, number):
-    patients_to_show = data.sample(number).patient_id.values
-    df_sample = data[data.patient_id.isin(patients_to_show)]
-    return df_sample
-
-def plot_random_patient_vital(data_sample, vital):
-    fig = plt.figure()
-    plot_value = vital
-    for i in data_sample['patient_id'].unique():
-        this_data = data_sample.loc[data_sample['patient_id'] == i]
-        plt.plot(np.arange(len(this_data)), this_data[plot_value].values, label = i)
-        plt.legend()
-        plt.title('plot_value')
-    return fig
 
 def calculate_MEWS(data):
     data.loc[(data['resp'] > 11)| (data['resp'] < 21),'MEWS_resp'] = 0
@@ -80,4 +65,4 @@ def unique_chronic_patient(data, chronic_value):
     return data
 
 def save_to_csv(data, name):
-    data.to_csv('name.csv')
+    data.to_csv(name)

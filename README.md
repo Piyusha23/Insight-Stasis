@@ -1,1 +1,1 @@
-# Inisght-Stasis
+# Insight-Stasis

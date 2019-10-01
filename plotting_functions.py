@@ -4,7 +4,9 @@ def get_random_data_sample(data, number):
     df_sample = data[data.patient_id.isin(patients_to_show)]
     return df_sample
 
-def plot_random_patient_vital(data_sample, vital):
+def plot_random_patient_vital(data, vital):
+    patients_to_show = data.sample(3).patient_id.values
+    df_sample = data[data.patient_id.isin(patients_to_show)]
     fig = plt.figure()
     plot_value = vital
     for i in data_sample['patient_id'].unique():

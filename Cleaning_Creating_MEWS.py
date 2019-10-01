@@ -2,10 +2,16 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import math
+import pickle
 from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
 from pandas import DataFrame
 from datetime import datetime
+
+def save_as_pickle(data, filename):
+    pickle_out = open(filename, "wb")
+    pickle.dump(data, pickle_out)
+    pickle_out.close()
 
 def rename_columns(data, column_to_name, new_name):
     return data.rename(columns={'column_to_name':'new_name'})

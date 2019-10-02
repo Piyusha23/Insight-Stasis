@@ -143,7 +143,7 @@ def length_continuous_data(dataframe, delta_t):
 
     return dataframe
 
-# Format the training/testing data for univariate single step 1D CNN 
+# Format the training/testing data for univariate single step 1D CNN
 def split_sequence_uni(sequence, n_steps):
     X, y = list(), list()
     for i in range(len(sequence)):
@@ -188,6 +188,35 @@ def split_sequences_multistep(sequences, n_steps):
         y.append(seq_y)
     return X, y
 
+def binary_labels_values_univariate(df, binary_threshold, n_steps):
+    import pandas as pd
+    from tqdm import tqdm
+
+    X_Total = list()
+    Y_Total = list()
+
+    thresh = binary_threshold #threshold for binary classification
+    n_steps = n_steps #number of time steps to look at
+
+    for i in tqdm(subset['continuous'].unique()):
+        this_data = subset.loc[subset['continuous'] == i]
+
+        X, Y = split_sequence_uni(this_data['MEWS_clean'].values, n_steps)
+
+        X_Total.extend(X)
+        Y_Total.extend(Y)
+
+        X_Total_D = pd.DataFrame(X_Total)
+        Y_Total_D = pd.DataFrame(Y_Total)
+
+        Y_Total_D[Y_Total_D[0] < 7] = 0
+        Y_Total_D[Y_Total_D[0] >= 7] = 1
+        print ("Number of nans in dataframe Y_Total =", Y_Total_D.isna().sum())
+        values, counts = np.unique(Y_Total_D, return_counts=True)
+        print ("Values of Y_Total = ", values)
+        print ("Counts of Y_Total values = ", counts)
+
+    return X_Total, Y_Total
 
 def binary_labels_values_multivariate(df, binary_threshold, n_steps):
     from sklearn.preprocessing import MinMaxScaler
@@ -232,7 +261,66 @@ def filter_continuous_data(dataframe, n_cont_values):
 
     return data_subset
 
-def create_test_train_CNN(X_tot, Y_tot):
+def create_test_train_mutli_CNN(X_total_D, Y_total_D):
+    #Counting number of 0s and 1s
+    X0 = X_Total_D[Y_Total_D[0] == 0]
+    X1 = X_Total_D[Y_Total_D[0] == 1]
+    Y0 = Y_Total_D[Y_Total_D[0] == 0]
+    Y1 = Y_Total_D[Y_Total_D[0] == 1]
+    print("Shape of Y0 = ", Y0.shape)
+    print("Shape of Y1 = ", Y1.shape)
+    print("Shape of X0 = ", X0.shape)
+    print("Shape of X1 = ", X1.shape)
+
+    X_half_0 = X0[:math.floor(len(X0)*0.35)]
+    Y_half_0 = Y0[:math.floor(len(Y0)*0.35)]
+    print("Shape of X_half = ", X_half_0.shape)
+    print("Shape of Y_half = ", Y_half_0.shape)
+
+    X_half_0_N = np.array(X_half_0)
+    Y_half_0_N = np.array(Y_half_0)
+    X1_N = np.array(X1)
+    Y1_N = np.array(Y1)
+
+    X_tot = []
+    Y_tot = []
+    X_tot.extend(X_half_0_N)
+    X_tot.extend(X1_N)
+    Y_tot.extend(Y_half_0_N)
+    Y_tot.extend(Y1_N)
+    print ("Length of X_tot = ", len(X_tot))
+    print ("Length of Y_tot = ", len(Y_tot))
+
+    uniqueValues, occurCount = np.unique(Y_tot, return_counts=True)
+    print("Number of unique values = ", uniqueValues)
+    print("Number of unique counts = ", occurCount)
+
+    total = list(zip(X_tot, Y_tot))
+    from random import shuffle
+    shuffle(total)
+
+    X_total = [total[i][0] for i in range(len(total))]
+    labels = [total[i][1] for i in range(len(total))]
+
+    print ("Shape of X_total = ", len(X_total))
+    print ("Shape of labels = ", len(labels))
+
+    X_train = X_total[:math.floor(len(X_total)*0.7)]
+    Y_train = labels[:math.floor(len(labels)*0.7)]
+    X_test = X_total[(math.floor(len(X_total)*0.7)):]
+    Y_test = labels[(math.floor(len(labels)*0.7)):]
+
+    uniqueValues, occurCount = np.unique(Y_train, return_counts=True)
+    uniqueValues_test, occurCount_test = np.unique(Y_test, return_counts=True)
+    print("Number of unique values in training set after balancing = ", uniqueValues)
+    print("Number of unique counts in training set after balancing = ", occurCount)
+    print("Number of unique values in testing set after balancing = ", uniqueValues_test)
+    print("Number of unique counts in testing set after balancing = ", occurCount_test)
+
+    return np.array(X_train), np.array(Y_train), np.array(X_test), np.array(Y_test)
+
+
+def create_test_train_mutli_CNN(X_tot, Y_tot):
     from random import shuffle
     total = list(zip(X_tot, Y_tot))
     shuffle(total)

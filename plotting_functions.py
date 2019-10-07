@@ -1,8 +1,5 @@
-
-def get_random_data_sample(data, number):
-    patients_to_show = data.sample(number).patient_id.values
-    df_sample = data[data.patient_id.isin(patients_to_show)]
-    return df_sample
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
 
 def plot_random_patient_vital(data, vital):
     patients_to_show = data.sample(3).patient_id.values
@@ -15,8 +12,6 @@ def plot_random_patient_vital(data, vital):
         plt.legend()
         plt.title('plot_value')
     return fig
-
-def plot_npatients_year(vitals_train_subset_above):
 
 #plotting the vital signs for a random sample of patients
 
@@ -49,13 +44,12 @@ def plot_MEWS(dataframe):
     plt.xlabel('Time', fontsize = 18)
     plt.ylabel('MEWS', fontsize = 18)
 
-def plot_ROC(fpr, tpr, fpr_SVM, tpr_SVM):
-    from sklearn.metrics import roc_curve, auc
+def plot_ROC(fpr, tpr):
 
     plt.figure()
-    plt.plot(fpr, tpr, color='darkorange', lw=1, label='SVM')
-    plt.plot(fpr_SVM, tpr_SVM, color='red', lw=1, label='Logistic Regression')
-    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+    plt.plot(fpr, tpr, color='darkorange', lw=1, label='LogisticRegression')
+    #plt.plot(fpr_SVM, tpr_SVM, color='red', lw=1, label='Logistic Regression')
+    #plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
@@ -63,3 +57,38 @@ def plot_ROC(fpr, tpr, fpr_SVM, tpr_SVM):
     plt.title('Receiver operating characteristic')
     plt.legend(loc="lower right")
     plt.show()
+
+def plotting_wrongly_classified(Y_test_arr, X_test_arr, y_pred_test, pred_label):
+    import random
+
+    #Reshape arrays
+    X_test_nn = X_test_arr.reshape((X_test_arr.shape[0], X_test_arr.shape[1], n_features))
+    Y_test_nn = Y_test_arr.reshape(-1)
+    Y_test = pd.DataFrame(Y_test_nn)
+
+    y_pred_test[y_pred_test < 0.5] = 0
+    y_pred_test[y_pred_test >= 0.5] = 1
+
+    #Get indices and waveforms of misclassified values
+    bool_v = (Y_test[0] == y_pred_test)*1
+    nn = X_test_nn[bool_v.index[bool_v == 0].tolist()]
+    yy = Y_test_nn[bool_v.index[bool_v == 0].tolist()]
+    yy = pd.DataFrame(yy)
+    yy_misclassified_as_zero = yy[yy[0] == 0]
+    yy_misclassifed_as_one = yy[yy[0] == 1]
+    nn_misclassified_as_zero = nn[yy_misclassified_as_zero.index].tolist()
+    nn_misclassified_as_one = nn[yy_misclassifed_as_one.index].tolist()
+
+    #Plotting misclassified values
+
+    for i in range(1,10):
+        plt.figure
+        plt.subplot(3,3,i)
+        if pred_label == "stable":
+            a = random.sample(range(1, len(nn_misclassified_as_zero)), 10)
+            plt.plot(nn_misclassified_as_zero[a[i]])
+            plt.suptitle('Wrongly predicted as stable (MEWS < 7) - should be unstable')
+        else:
+            a = random.sample(range(1, len(nn_misclassified_as_one)), 10)
+            plt.plot(nn_misclassified_as_one[a[i]])
+            plt.suptitle('Wrongly predicted as unstable (MEWS > 7) - should be stable')

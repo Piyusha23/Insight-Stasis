@@ -3,9 +3,12 @@ import numpy as np
 import seaborn as sns
 import math
 from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split
 from pandas import DataFrame
 from datetime import datetime
+from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from random import shuffle
 
 # There are lots of duplicate values over seconds or there are sampling discrepancies, i.e,
 # things are sampled over a couple of minutes. This functions takes the dataframe and the
@@ -13,7 +16,6 @@ from datetime import datetime
 # by taking the median of the values.
 
 def group_by_minute(dataframe, minute):
-    from tqdm import tqdm
 
     features = dataframe['patient_id'].unique()
     #dataframe['delta'] = (dataframe['datetime']-dataframe['datetime'].shift(1)).astype('timedelta64[m]')
@@ -37,7 +39,7 @@ def group_by_minute(dataframe, minute):
 #Create a new feature - this represents the engineered feature, i.e. the broken up parts
 # of the time series. The time series is broken at the peaks - this can be 7 or greater.
 def create_feature_vectors(dataframe, threshold_value, delta_t):
-    from tqdm import tqdm
+
     temp = 0
     keep = []
     dataframe['datetime'] = dataframe.index
@@ -94,7 +96,7 @@ def get_features_above_and_below_threshold(subset_dataframe, threshold_value):
     return subset_above_seven, subset_below_seven
 
 def get_last_n_points(dataframe, n):
-    from tqdm import tqdm
+
     new_frame = []
     for i in tqdm(dataframe['feature_new'].unique()):
         this_data = dataframe.loc[dataframe['feature_new'] == i]
@@ -119,7 +121,7 @@ def create_training_data(data_below_seven, data_above_seven):
     return all_labeled_data
 
 def length_continuous_data(dataframe, delta_t):
-    from tqdm import tqdm
+
     temp = 0
     keep = []
     dataframe['datetime'] = dataframe.index
@@ -136,7 +138,6 @@ def length_continuous_data(dataframe, delta_t):
             else:
                 keep.append(temp)
 
-    print (this_data.shape)
     dataframe['continuous'] = keep
 
     dataframe.dropna()
@@ -153,7 +154,7 @@ def split_sequence_uni(sequence, n_steps):
         if end_ix > len(sequence)-1:
             break
         # gather input and output parts of the pattern
-        seq_x, seq_y = sequence[i:end_ix], sequence[end_ix-1:]
+        seq_x, seq_y = sequence[i:end_ix], sequence[end_ix]
         X.append(seq_x)
         y.append(seq_y)
     return np.array(X), np.array(y)
@@ -176,7 +177,7 @@ def split_sequences_multivariate(sequences, n_steps):
 # Format the training/testing data for univariate multi-step 1D CNN
 def split_sequences_multistep(sequences, n_steps):
     X, y = list(), list()
-    for i in range(len(sequences)):
+    for i in tqdm(range(len(sequences))):
         # find the end of this pattern
         end_ix = i + n_steps
         # check if we are beyond the dataset
@@ -189,8 +190,6 @@ def split_sequences_multistep(sequences, n_steps):
     return X, y
 
 def binary_labels_values_univariate(df, binary_threshold, n_steps):
-    import pandas as pd
-    from tqdm import tqdm
 
     X_Total = list()
     Y_Total = list()
@@ -198,31 +197,28 @@ def binary_labels_values_univariate(df, binary_threshold, n_steps):
     thresh = binary_threshold #threshold for binary classification
     n_steps = n_steps #number of time steps to look at
 
-    for i in tqdm(subset['continuous'].unique()):
-        this_data = subset.loc[subset['continuous'] == i]
+    for i in tqdm(df['continuous'].unique()):
+        this_data = df.loc[df['continuous'] == i]
 
         X, Y = split_sequence_uni(this_data['MEWS_clean'].values, n_steps)
 
         X_Total.extend(X)
         Y_Total.extend(Y)
 
-        X_Total_D = pd.DataFrame(X_Total)
-        Y_Total_D = pd.DataFrame(Y_Total)
+    X_Total_D = pd.DataFrame(X_Total)
+    Y_Total_D = pd.DataFrame(Y_Total)
 
-        Y_Total_D[Y_Total_D[0] < 7] = 0
-        Y_Total_D[Y_Total_D[0] >= 7] = 1
-        print ("Number of nans in dataframe Y_Total =", Y_Total_D.isna().sum())
-        values, counts = np.unique(Y_Total_D, return_counts=True)
-        print ("Values of Y_Total = ", values)
-        print ("Counts of Y_Total values = ", counts)
+    Y_Total_D[Y_Total_D[0] < binary_threshold] = 0
+    Y_Total_D[Y_Total_D[0] >= binary_threshold] = 1
+    print ("Number of nans in dataframe Y_Total =", Y_Total_D.isna().sum())
+    values, counts = np.unique(Y_Total_D, return_counts=True)
+    #print ("Values of Y_Total = ", values)
+    #print ("Counts of Y_Total values = ", counts)
 
-    return X_Total, Y_Total
+    return X_Total_D, Y_Total_D
 
 def binary_labels_values_multivariate(df, binary_threshold, n_steps):
-    from sklearn.preprocessing import MinMaxScaler
-    import numpy as np
 
-    from tqdm import tqdm
     scaler = MinMaxScaler()
     X_Total = list()
     Y_Total = list()
@@ -240,10 +236,10 @@ def binary_labels_values_multivariate(df, binary_threshold, n_steps):
         this_data_values = pd.DataFrame(this_data_scaled)
         this_data_total = pd.concat([this_data_values,labels], axis=1)
 
-        X, Y = split_sequences_multivariate(this_data_total.values, n_steps)
+    X, Y = split_sequences_multivariate(this_data_total.values, n_steps)
 
-        X_Total.extend(X)
-        Y_Total.extend(Y)
+    X_Total.extend(X)
+    Y_Total.extend(Y)
     return np.array(X_Total), np.array(Y_Total)
 
 def filter_continuous_data(dataframe, n_cont_values):
@@ -261,7 +257,7 @@ def filter_continuous_data(dataframe, n_cont_values):
 
     return data_subset
 
-def create_test_train_mutli_CNN(X_total_D, Y_total_D):
+def create_test_train_uni_CNN(X_Total_D, Y_Total_D,balancing_fraction):
     #Counting number of 0s and 1s
     X0 = X_Total_D[Y_Total_D[0] == 0]
     X1 = X_Total_D[Y_Total_D[0] == 1]
@@ -272,8 +268,8 @@ def create_test_train_mutli_CNN(X_total_D, Y_total_D):
     print("Shape of X0 = ", X0.shape)
     print("Shape of X1 = ", X1.shape)
 
-    X_half_0 = X0[:math.floor(len(X0)*0.35)]
-    Y_half_0 = Y0[:math.floor(len(Y0)*0.35)]
+    X_half_0 = X0[:math.floor(len(X0)*balancing_fraction)]
+    Y_half_0 = Y0[:math.floor(len(Y0)*balancing_fraction)]
     print("Shape of X_half = ", X_half_0.shape)
     print("Shape of Y_half = ", Y_half_0.shape)
 
@@ -320,8 +316,8 @@ def create_test_train_mutli_CNN(X_total_D, Y_total_D):
     return np.array(X_train), np.array(Y_train), np.array(X_test), np.array(Y_test)
 
 
-def create_test_train_mutli_CNN(X_tot, Y_tot):
-    from random import shuffle
+def create_test_train_multi_CNN(X_tot, Y_tot):
+
     total = list(zip(X_tot, Y_tot))
     shuffle(total)
 

@@ -13,6 +13,10 @@ def save_as_pickle(data, filename):
     pickle.dump(data, pickle_out)
     pickle_out.close()
 
+
+def save_to_csv(data, name):
+    data.to_csv(name)
+    
 def rename_columns(data, column_to_name, new_name):
     return data.rename(columns={'column_to_name':'new_name'})
 
@@ -69,6 +73,3 @@ def unique_chronic_patient(data, chronic_value):
     print ('Number of patients in dataset with sensor error removed = ', len_unique_ids)
 
     return data
-
-def save_to_csv(data, name):
-    data.to_csv(name)

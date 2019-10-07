@@ -1,7 +1,14 @@
+from statsmodels.tsa.arima_model import ARIMA
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
+import itertools
+import math
+import pandas as pd
+import matplotlib.pyplot as plt
 
 def create_test_train_split(data):
-    X = data[:,0:3]
+
+    X = data[:,:-1]
     Y = data[:,-1]
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.33, random_state=42)
     return X_train, X_test, y_train, y_test
@@ -21,11 +28,9 @@ def split_sequences(sequences, n_steps):
     return np.array(X), np.array(y)
 
 def Model_ARIMA(data_one_patient, p, d, q):
-    from statsmodels.tsa.arima_model import ARIMA
-    from sklearn.metrics import mean_squared_error
-    import itertools
+    #The input data_one_patient is the continuous MEWS score for one patient
 
-    #creating test train split
+    #creating test train split - taking 70% of the patient time series as training
     train_len = math.floor(len(data_one_patient)*0.7)
     y_train = data_one_patient['MEWS'].iloc[:train_len]
     y_test = data_one_patient['MEWS'].iloc[train_len:]
@@ -40,7 +45,7 @@ def Model_ARIMA(data_one_patient, p, d, q):
     model_fit = ARIMA_model.fit(disp=0)
     print(model_fit.summary())
 
-    residuals = DataFrame(model_fit.resid)
+    residuals = pd.DataFrame(model_fit.resid)
     residuals.plot()
     plt.show()
     residuals.plot(kind='kde')
@@ -101,26 +106,28 @@ def Model_SVM(X_train, X_test, y_train, y_test, kernel_type):
     fpr, tpr, _ = roc_curve(y_test, y_score)
     return fpr, tpr
 
-def Model_Uni_1D_CNN_define(X_train_arr, X_test_arr, n_steps):
+#Defining the architecture of the 1D univariate CNN model
+def Model_Uni_1D_CNN_define(n_steps, n_features):
     from numpy import array
     from keras.models import Sequential
     from keras.layers import Dense
     from keras.layers import Flatten
     from keras.layers.convolutional import Conv1D
     from keras.layers.convolutional import MaxPooling1D
+    from keras.callbacks import EarlyStopping
+    from matplotlib import pyplot
     from keras import regularizers
     from keras.layers import Dropout
     from keras.callbacks import ModelCheckpoint
 
-    n_features = 1
-    X_train_nn = X_train_arr.reshape((X_train_arr.shape[0], X_train_arr.shape[1], n_features))
-    X_test_nn = X_test_arr.reshape((X_test_arr.shape[0], X_test_arr.shape[1], n_features))
-    #n_steps
-
+    #n_steps is the number of training features steps. if n = 3, you have 15 mintes of training data because
+    # every step is 5 minutes
+    n_steps = n_steps
+    n_features = n_features
     model = Sequential()
     model.add(Conv1D(filters=64, kernel_size=2, activation='relu', input_shape=(n_steps, n_features), kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.2))
-    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Flatten())
     model.add(Dropout(0.2))
@@ -129,17 +136,27 @@ def Model_Uni_1D_CNN_define(X_train_arr, X_test_arr, n_steps):
     model.add(Dense(50, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.2))
     model.add(Dense(1, activation='sigmoid'))
-
     model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
+
     model.summary()
 
     return model
 
+#Compiling and training the univariate 1D CNN model
 def run_uni_1D_CNN(model, X_train, Y_train, X_test, Y_test, filename):
     from keras.callbacks import EarlyStopping
     from matplotlib import pyplot
+    from keras.callbacks import ModelCheckpoint
 
-    filepath="filename.hdf5"
+    n_features = 1
+    X_train_nn = X_train.reshape((X_train.shape[0], X_train.shape[1], n_features))
+    X_test_nn = X_test.reshape((X_test.shape[0], X_test.shape[1], n_features))
+    Y_train_nn = Y_train.reshape(-1)
+    Y_test_nn = Y_test.reshape(-1)
+
+    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
+
+    filepath= filename
     checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
 
@@ -167,6 +184,7 @@ def run_uni_1D_CNN(model, X_train, Y_train, X_test, Y_test, filename):
 
     return train_acc, test_acc
 
+#Defining the architecture of the multivariate 1D CNN model
 def Model_Mutlivariate_1D_CNN_define(X_train_arr, X_test_arr):
 
     from numpy import array
@@ -196,9 +214,6 @@ def Model_Mutlivariate_1D_CNN_define(X_train_arr, X_test_arr):
     model.add(Dropout(0.2))
     model.add(Dense(1, activation='sigmoid'))
 
-    adam = keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
-    model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
-
     model.summary()
 
     return model
@@ -206,6 +221,11 @@ def Model_Mutlivariate_1D_CNN_define(X_train_arr, X_test_arr):
 def run_multi_1D_CNN(model, X_train, Y_train, X_test, Y_test, filename):
     from keras.callbacks import EarlyStopping
     from matplotlib import pyplot
+
+
+
+    adam = keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
+    model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
 
     filepath="weights_1DCNN_nstep10_thresh7.best.hdf5"
     checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
@@ -235,3 +255,33 @@ def run_multi_1D_CNN(model, X_train, Y_train, X_test, Y_test, filename):
     plt.show()
 
     return train_acc, test_acc
+
+#This function loads the trained 1D CNN model and predicts the labels for your test set
+def load_trained_model_uni(filename, X_test, Y_test, n_steps, n_features):
+    from numpy import array
+    from matplotlib import pyplot
+    from tensorflow import keras
+    from sklearn.metrics import roc_curve, auc
+
+    model = Model_Uni_1D_CNN_define(n_steps, n_features)
+    loaded_model = keras.models.load_model(filename)
+    loaded_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+    X_test_nn = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
+    Y_test_nn = Y_test.reshape(-1)
+
+    y_pred_keras = loaded_model.predict(X_test_nn).ravel()
+
+    fpr_keras, tpr_keras, thresholds_keras = roc_curve(Y_test_nn, y_pred_keras)
+    auc_keras = auc(fpr_keras, tpr_keras)
+
+    plt.figure(1)
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.plot(fpr_keras, tpr_keras, label='Keras (area = {:.3f})'.format(auc_keras))
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve')
+    plt.legend(loc='best')
+    plt.show()
+
+    return y_pred_keras

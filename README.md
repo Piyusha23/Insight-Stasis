@@ -1,3 +1,5 @@
 # Insight-Stasis
 
-This project predicts patient outcomes based on vital sign measurements
+The work in this project was done in partnership with a local LA company. 
+
+# Goal : Predict patient outcomes based on vital sign measurements

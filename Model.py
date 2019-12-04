@@ -136,7 +136,7 @@ def Model_Uni_1D_CNN_define(n_steps, n_features):
     model.add(Dense(50, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.2))
     model.add(Dense(1, activation='sigmoid'))
-    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     model.summary()
 
@@ -154,14 +154,14 @@ def run_uni_1D_CNN(model, X_train, Y_train, X_test, Y_test, filename):
     Y_train_nn = Y_train.reshape(-1)
     Y_test_nn = Y_test.reshape(-1)
 
-    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     filepath= filename
     checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
 
     # Fit the model
-    history = model.fit(X_train_nn, Y_train_nn, validation_split=0.33, epochs=150, batch_size=10, callbacks=callbacks_list, verbose=1)
+    history = model.fit(X_train_nn, Y_train_nn, validation_split=0.33, epochs=150, batch_size=128, callbacks=callbacks_list, verbose=1)
 
     tt, train_acc = model.evaluate(X_train_nn, Y_train_nn, verbose=0)
     te, test_acc = model.evaluate(X_test_nn, Y_test_nn, verbose=0)
@@ -225,14 +225,14 @@ def run_multi_1D_CNN(model, X_train, Y_train, X_test, Y_test, filename):
 
 
     adam = keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
-    model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
 
     filepath="weights_1DCNN_nstep10_thresh7.best.hdf5"
     checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
 
     # Fit the model
-    history = model.fit(X_train, Y_train, validation_split=0.33, epochs=150, batch_size=10, callbacks=callbacks_list, verbose=1)
+    history = model.fit(X_train, Y_train, validation_split=0.33, epochs=150, batch_size=128, callbacks=callbacks_list, verbose=1)
 
     _, train_acc = model.evaluate(X_train, Y_train, verbose=0)
     _, test_acc = model.evaluate(X_test, Y_test, verbose=0)
